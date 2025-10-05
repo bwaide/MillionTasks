@@ -1,0 +1,94 @@
+# Environment Variables
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+junit.xml
+
+# Logs
+logs/
+*.log
+log.txt
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# TypeScript
+*.tsbuildinfo
+.tscache/
+
+# Package manager files
+.yarn/
+.yarnrc.yml
+.pnp.*
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.cert
+
+# Backups
+*.backup
+*.old
+backup/
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Project specific
+/uploads/
+/downloads/
+session.json
+*.session
+*.session-journal
