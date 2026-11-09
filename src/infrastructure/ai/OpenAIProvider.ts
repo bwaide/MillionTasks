@@ -90,14 +90,26 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async classifyIntent(message: string): Promise<MessageIntent> {
-    const systemPrompt = `You are an intent classifier for a task management system.
-    
+    const systemPrompt = `You are an intent classifier for a task management system with GTD (Getting Things Done) support.
+
     Classify the user's intent from these options:
+
+    GTD Intents (check first - these are for EXISTING tasks):
+    - schedule_task_now: Schedule an existing task to NOW (today/current)
+    - schedule_task_next: Schedule an existing task to NEXT (upcoming/soon)
+    - schedule_task_later: Schedule an existing task to LATER (backlog/someday)
+    - defer_task: Defer/postpone an existing task
+    - list_now_tasks: Show NOW tasks
+    - list_next_tasks: Show NEXT tasks
+    - list_later_tasks: Show LATER tasks
+    - pick_now_tasks: Pick tasks to promote to NOW
+
+    General Task Intents:
     - create_task: Creating a new task
     - update_task: Modifying an existing task
     - complete_task: Marking a task as done
     - delete_task: Removing a task
-    - list_tasks: Showing tasks
+    - list_tasks: Showing all tasks
     - assign_task: Assigning a task to someone
     - set_priority: Changing task priority
     - set_due_date: Setting or changing due date
@@ -106,7 +118,9 @@ export class OpenAIProvider implements AIProvider {
     - query_status: Asking about task status
     - help: Asking for help or commands
     - unknown: Unclear intent
-    
+
+    IMPORTANT: "Schedule the task X" means schedule_task_now/next/later (EXISTING task), NOT create_task.
+
     Return only the intent name, nothing else.`;
 
     try {
@@ -174,20 +188,28 @@ export class OpenAIProvider implements AIProvider {
 
   private buildProcessingPrompt(message: string, context?: MessageContext): string {
     let prompt = `Process this message: "${message}"
-    
+
     Return a JSON object with:
     {
-      "intent": "create_task|update_task|complete_task|delete_task|list_tasks|assign_task|set_priority|set_due_date|add_tag|remove_tag|query_status|help|unknown",
+      "intent": "schedule_task_now|schedule_task_next|schedule_task_later|defer_task|list_now_tasks|list_next_tasks|list_later_tasks|pick_now_tasks|create_task|update_task|complete_task|delete_task|list_tasks|assign_task|set_priority|set_due_date|add_tag|remove_tag|query_status|help|unknown",
       "extractedData": {
         "title": "string",
         "description": "string (optional)",
         "priority": "low|medium|high|urgent (optional)",
         "dueDate": "ISO date string (optional)",
         "tags": ["array of strings (optional)"],
-        "assignee": "string (optional)"
+        "assignee": "string (optional)",
+        "taskReference": "string (optional, for GTD: reference to existing task title)",
+        "gtdStatus": "now|next|later (optional, for GTD scheduling)"
       },
       "confidence": 0.8
-    }`;
+    }
+
+    IMPORTANT:
+    - If scheduling an EXISTING task (e.g. "schedule the task X"), use schedule_task_now/next/later intent
+    - Set taskReference to identify which task (partial title match)
+    - Set gtdStatus to now/next/later based on context
+    - "today"/"now"/"current" = now, "next"/"upcoming"/"soon" = next, "later"/"backlog"/"someday" = later`;
 
     if (context?.projectId) {
       prompt += `\n\nCurrent project: ${context.projectId}`;
@@ -224,8 +246,19 @@ export class OpenAIProvider implements AIProvider {
 
   private parseIntent(intentString: string): MessageIntent {
     const intent = intentString.toLowerCase().replace(/[^a-z_]/g, '');
-    
+
     switch (intent) {
+      // GTD intents
+      case 'schedule_task_now': return MessageIntent.SCHEDULE_TASK_NOW;
+      case 'schedule_task_next': return MessageIntent.SCHEDULE_TASK_NEXT;
+      case 'schedule_task_later': return MessageIntent.SCHEDULE_TASK_LATER;
+      case 'defer_task': return MessageIntent.DEFER_TASK;
+      case 'list_now_tasks': return MessageIntent.LIST_NOW_TASKS;
+      case 'list_next_tasks': return MessageIntent.LIST_NEXT_TASKS;
+      case 'list_later_tasks': return MessageIntent.LIST_LATER_TASKS;
+      case 'pick_now_tasks': return MessageIntent.PICK_NOW_TASKS;
+
+      // General task intents
       case 'create_task': return MessageIntent.CREATE_TASK;
       case 'update_task': return MessageIntent.UPDATE_TASK;
       case 'complete_task': return MessageIntent.COMPLETE_TASK;
@@ -281,6 +314,18 @@ export class OpenAIProvider implements AIProvider {
 
     if (data.projectHint && typeof data.projectHint === 'string') {
       result.projectHint = data.projectHint.trim();
+    }
+
+    // GTD fields
+    if (data.taskReference && typeof data.taskReference === 'string') {
+      result.taskReference = data.taskReference.trim();
+    }
+
+    if (data.gtdStatus && typeof data.gtdStatus === 'string') {
+      const status = data.gtdStatus.toLowerCase();
+      if (status === 'now' || status === 'next' || status === 'later') {
+        result.gtdStatus = status as 'now' | 'next' | 'later';
+      }
     }
 
     return result;

@@ -59,25 +59,20 @@ export class CompleteTaskUseCase {
       // Determine target status
       const targetStatus = request.status || TaskStatus.DONE;
 
-      // Validate status transition
-      const canTransition = task.status === 'todo' 
-        ? targetStatus.toString() === 'in_progress' || targetStatus.toString() === 'done' || targetStatus.toString() === 'cancelled'
-        : task.status === 'in_progress'
-        ? targetStatus.toString() === 'in_review' || targetStatus.toString() === 'done' || targetStatus.toString() === 'cancelled'
-        : task.status === 'in_review'
-        ? targetStatus.toString() === 'done' || targetStatus.toString() === 'in_progress' || targetStatus.toString() === 'cancelled'
-        : false;
+      // Update task status - handle multi-step transitions if needed
+      let updatedTask = task;
 
-      if (!canTransition) {
-        return {
-          task,
-          success: false,
-          errors: [`Cannot transition from ${task.status} to ${targetStatus.toString()}`],
-        };
+      // If trying to complete a task that's still in 'todo' status,
+      // we need to transition through 'in_progress' first
+      if (task.status === 'todo' && targetStatus.isDone()) {
+        // First move to in_progress
+        updatedTask = updatedTask.updateStatus('in_progress');
+        // Then move to done
+        updatedTask = updatedTask.updateStatus('done');
+      } else {
+        // Direct transition
+        updatedTask = updatedTask.updateStatus(targetStatus.toString() as any);
       }
-
-      // Update task status
-      let updatedTask = task.updateStatus(targetStatus.toString() as any);
 
       // Log time if provided
       if (request.actualHours && request.actualHours > 0) {

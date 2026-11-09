@@ -11,6 +11,8 @@ export const TaskSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   tags: z.array(z.string()).default([]),
   dueDate: z.date().optional(),
+  scheduledDate: z.date().optional(), // GTD: When task should be worked on
+  gtdStatus: z.enum(['now', 'next', 'later']).optional(), // GTD: NOW/NEXT/LATER classification
   estimatedHours: z.number().positive().optional(),
   actualHours: z.number().nonnegative().default(0),
   metadata: z.object({
@@ -99,6 +101,14 @@ export class Task {
 
   get dueDate(): Date | undefined {
     return this.props.dueDate;
+  }
+
+  get scheduledDate(): Date | undefined {
+    return this.props.scheduledDate;
+  }
+
+  get gtdStatus(): 'now' | 'next' | 'later' | undefined {
+    return this.props.gtdStatus;
   }
 
   get estimatedHours(): number | undefined {
@@ -247,6 +257,42 @@ export class Task {
     });
   }
 
+  // GTD methods
+  scheduleFor(gtdStatus: 'now' | 'next' | 'later', scheduledDate?: Date): Task {
+    // NOW tasks must be scheduled for today
+    if (gtdStatus === 'now' && scheduledDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const schedDate = new Date(scheduledDate);
+      schedDate.setHours(0, 0, 0, 0);
+
+      if (schedDate.getTime() !== today.getTime()) {
+        throw new Error('NOW tasks must be scheduled for today');
+      }
+    }
+
+    // LATER tasks typically don't have a specific scheduled date
+    if (gtdStatus === 'later' && scheduledDate) {
+      scheduledDate = undefined;
+    }
+
+    return new Task({
+      ...this.props,
+      gtdStatus,
+      scheduledDate,
+      updatedAt: new Date(),
+    });
+  }
+
+  clearGTDSchedule(): Task {
+    return new Task({
+      ...this.props,
+      gtdStatus: undefined,
+      scheduledDate: undefined,
+      updatedAt: new Date(),
+    });
+  }
+
   // Query methods
   isAssignedTo(userId: string): boolean {
     return this.props.assigneeId === userId;
@@ -285,6 +331,29 @@ export class Task {
   getPriorityWeight(): number {
     const weights = { low: 1, medium: 2, high: 3, urgent: 4 };
     return weights[this.props.priority];
+  }
+
+  isScheduledForNow(): boolean {
+    return this.props.gtdStatus === 'now';
+  }
+
+  isScheduledForNext(): boolean {
+    return this.props.gtdStatus === 'next';
+  }
+
+  isScheduledForLater(): boolean {
+    return this.props.gtdStatus === 'later';
+  }
+
+  isScheduledForToday(): boolean {
+    if (!this.props.scheduledDate) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const schedDate = new Date(this.props.scheduledDate);
+    schedDate.setHours(0, 0, 0, 0);
+
+    return schedDate.getTime() === today.getTime();
   }
 
   // Equality and serialization

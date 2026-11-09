@@ -206,11 +206,21 @@ export class TelegramBot implements INotificationProvider {
     // Handle callback queries (inline keyboard presses)
     this.bot.on('callback_query', async (ctx) => {
       try {
-        await ctx.answerCbQuery();
-        // Delegate to appropriate handler based on callback_data
-        const data = ctx.callbackQuery.data;
-        if (data) {
-          await this.handleCallbackQuery(ctx, data);
+        // First try to delegate to message handlers
+        let handled = false;
+        for (const handler of this.messageHandlers) {
+          await handler.handle(ctx);
+          handled = true;
+          break; // Only let first handler process it
+        }
+
+        // If no message handler processed it, use built-in handler
+        if (!handled) {
+          await ctx.answerCbQuery();
+          const data = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : null;
+          if (data) {
+            await this.handleCallbackQuery(ctx, data);
+          }
         }
       } catch (error) {
         console.error('Error handling callback query:', error);

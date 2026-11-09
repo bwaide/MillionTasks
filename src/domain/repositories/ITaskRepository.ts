@@ -115,14 +115,20 @@ export interface ITaskRepository {
   findActive(filters?: TaskFilters): Promise<Task[]>;
 
   /**
+   * Find tasks by user and GTD status (NOW/NEXT/LATER)
+   */
+  findByUserAndGTDStatus(userId: string, gtdStatus: 'now' | 'next' | 'later'): Promise<Task[]>;
+
+  /**
    * Update an existing task
    */
   update(task: Task): Promise<void>;
 
   /**
    * Delete a task by ID
+   * @returns true if deleted successfully, false otherwise
    */
-  delete(id: string): Promise<void>;
+  delete(id: string): Promise<boolean>;
 
   /**
    * Check if a task exists by ID

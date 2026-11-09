@@ -20,10 +20,24 @@ import { SupabaseProjectRepository } from './infrastructure/database/repositorie
 import { CreateTaskUseCase } from './application/use-cases/tasks/CreateTaskUseCase.js';
 import { ListTasksUseCase } from './application/use-cases/tasks/ListTasksUseCase.js';
 import { CompleteTaskUseCase } from './application/use-cases/tasks/CompleteTaskUseCase.js';
+import { DeleteTaskUseCase } from './application/use-cases/tasks/DeleteTaskUseCase.js';
+import { ScheduleTaskUseCase } from './application/use-cases/tasks/ScheduleTaskUseCase.js';
 import { NotificationService, NotificationChannel } from './application/services/NotificationService.js';
+import { checkForDuplicateProcess, createLockFile, formatDuplicateProcessError } from './utils/processCheck.js';
 
 async function main() {
   console.log('🚀 Starting MillionTasks...');
+
+  // Check for duplicate instances
+  const processCheck = checkForDuplicateProcess();
+  if (processCheck.isDuplicate) {
+    console.error(formatDuplicateProcessError(processCheck));
+    process.exit(1);
+  }
+
+  // Create lock file to prevent future duplicates
+  createLockFile();
+  console.log(`✅ Process check passed (PID: ${process.pid})`);
   
   // Validate configuration
   const credentials = hasValidCredentials();
@@ -106,8 +120,10 @@ async function main() {
       projectRepository,
       userRepository
     );
-    const listTasksUseCase = new ListTasksUseCase(taskRepository, projectRepository);
-    const completeTaskUseCase = new CompleteTaskUseCase(taskRepository);
+    const listTasksUseCase = new ListTasksUseCase(taskRepository, projectRepository, userRepository);
+    const completeTaskUseCase = new CompleteTaskUseCase(taskRepository, userRepository);
+    const deleteTaskUseCase = new DeleteTaskUseCase(taskRepository, userRepository);
+    const scheduleTaskUseCase = new ScheduleTaskUseCase(taskRepository, userRepository);
 
     // Initialize Telegram bot
     console.log('📱 Initializing Telegram bot...');
@@ -127,6 +143,9 @@ async function main() {
       projectRepository,
       createTaskUseCase,
       listTasksUseCase,
+      completeTaskUseCase,
+      deleteTaskUseCase,
+      scheduleTaskUseCase,
       messageProcessor
     );
     

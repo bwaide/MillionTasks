@@ -17,6 +17,9 @@ export interface ExtractedTaskData {
   tags?: string[];
   assignee?: string;
   projectHint?: string;
+  // GTD-specific fields
+  taskReference?: string; // Reference to existing task (title fragment, number, etc.)
+  gtdStatus?: 'now' | 'next' | 'later';
 }
 
 export enum MessageIntent {
@@ -33,6 +36,15 @@ export enum MessageIntent {
   QUERY_STATUS = 'query_status',
   HELP = 'help',
   UNKNOWN = 'unknown',
+  // GTD intents
+  SCHEDULE_TASK_NOW = 'schedule_task_now',
+  SCHEDULE_TASK_NEXT = 'schedule_task_next',
+  SCHEDULE_TASK_LATER = 'schedule_task_later',
+  LIST_NOW_TASKS = 'list_now_tasks',
+  LIST_NEXT_TASKS = 'list_next_tasks',
+  LIST_LATER_TASKS = 'list_later_tasks',
+  PICK_NOW_TASKS = 'pick_now_tasks',
+  DEFER_TASK = 'defer_task',
 }
 
 export interface IAIService {

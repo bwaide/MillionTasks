@@ -343,6 +343,29 @@ export class SupabaseTaskRepository implements ITaskRepository {
     }
   }
 
+  async findByUserAndGTDStatus(userId: string, gtdStatus: 'now' | 'next' | 'later'): Promise<Task[]> {
+    try {
+      const client = this.getClient();
+      const { data, error } = await client
+        .from('tasks')
+        .select('*')
+        .eq('gtd_status', gtdStatus)
+        .or(`created_by.eq.${userId},assigned_to.eq.${userId}`)
+        .not('status', 'in', '(done,cancelled)')
+        .order('priority', { ascending: false })
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (error) {
+        throw new Error(`Failed to find GTD tasks: ${error.message}`);
+      }
+
+      return (data || []).map(row => this.mapRowToTask(row));
+    } catch (error) {
+      console.error('Error finding GTD tasks:', error);
+      throw new Error(`Failed to find GTD tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async update(task: Task): Promise<void> {
     try {
       const taskProps = task.toJSON();
@@ -362,19 +385,21 @@ export class SupabaseTaskRepository implements ITaskRepository {
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string): Promise<boolean> {
     try {
       const client = this.getClient();
-      const { error } = await client.from('tasks').delete().eq('id', id);
+      const { error, count } = await client.from('tasks').delete().eq('id', id);
 
       if (error) {
-        throw new Error(error.message);
+        console.error('Error deleting task:', error);
+        return false;
       }
 
       console.log(`Task deleted: ${id}`);
+      return true;
     } catch (error) {
       console.error('Error deleting task:', error);
-      throw new Error(`Failed to delete task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
   }
 
@@ -840,6 +865,8 @@ export class SupabaseTaskRepository implements ITaskRepository {
       priority: this.numberToPriority(row.priority),
       tags: row.tags || [],
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
+      scheduledDate: row.scheduled_date ? new Date(row.scheduled_date) : undefined,
+      gtdStatus: row.gtd_status ? (row.gtd_status as 'now' | 'next' | 'later') : undefined,
       estimatedHours: undefined,
       actualHours: 0,
       metadata: {
@@ -866,6 +893,8 @@ export class SupabaseTaskRepository implements ITaskRepository {
       priority: this.priorityToNumber(props.priority as any),
       tags: props.tags,
       due_date: props.dueDate?.toISOString(),
+      scheduled_date: props.scheduledDate?.toISOString(),
+      gtd_status: props.gtdStatus,
       metadata: {
         source: props.metadata.source,
         originalMessage: props.metadata.originalMessage,
@@ -887,6 +916,8 @@ export class SupabaseTaskRepository implements ITaskRepository {
       priority: this.priorityToNumber(props.priority as any),
       tags: props.tags,
       due_date: props.dueDate?.toISOString(),
+      scheduled_date: props.scheduledDate?.toISOString(),
+      gtd_status: props.gtdStatus,
       metadata: {
         source: props.metadata.source,
         originalMessage: props.metadata.originalMessage,
